@@ -39,8 +39,8 @@ spawns a job using the template of another resource. Unfortunately the options a
 5. An interactive shell is attached
 6. The pod is cleaned up when the shell terminates
 
-This could easily be a shell script, but I figured that using the `go-client` for kubernetes would
-be a bit more stable and easier to distribute.
+This could easily be a shell script, but I figured that using the `client-go` library for kubernetes
+would be a bit more stable and easier to distribute.
 
 # Usage
 
