@@ -91,3 +91,5 @@ kdebug -namespace rails-demo \
 - No support for containers that don't have any interactive environment (e.g. `FROM scratch` images)
 - No support overwriting the resource configuration
 - The output is very noisy
+- The way the `kubecfg` is loaded does not load the default namespace for the context. This forces
+  the user to specify the namespace anyway.
