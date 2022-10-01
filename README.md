@@ -93,3 +93,4 @@ kdebug -namespace rails-demo \
 - The output is very noisy
 - The way the `kubecfg` is loaded does not load the default namespace for the context. This forces
   the user to specify the namespace anyway.
+- Terminal size is not respected, so things like readline behave strangely
