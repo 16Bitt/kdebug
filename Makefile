@@ -17,7 +17,10 @@ clean:
 $(OUTDIR):
 	mkdir -p build
 
-$(TARGETS): $(OUTDIR) $(SOURCES)
+vet: $(SOURCES)
+	go vet $(SOURCES)
+
+$(TARGETS): $(OUTDIR) $(SOURCES) vet
 	$(OPTS) go build -o $(OUTDIR)/kdebug-$(BUILD_SUFFIX) $(SOURCES)
 
 $(TARGET_PREFIX)-darwin-x86_64: OPTS := GOOS=darwin GOARCH=amd64

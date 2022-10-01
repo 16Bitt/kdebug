@@ -27,7 +27,7 @@ type clientWrapper struct {
 	ctx    context.Context
 }
 
-type kubeResourceType string
+type kubeResourceType int
 
 const (
 	kubeResourceTypeUnknown     = kubeResourceType(0)
@@ -93,7 +93,7 @@ func main() {
 		log.Printf("Removing pod %s...", created.ObjectMeta.Name)
 		err := client.terminate(created)
 		if err != nil {
-			log.Printf("Could not remove pod: %w", err)
+			log.Printf("Could not remove pod: %s", err)
 		} else {
 			log.Printf("Cleaned up successfully.")
 		}
@@ -309,7 +309,7 @@ func (c *clientWrapper) execAttached(pod *corev1.Pod, containerName string, comm
 	defer func() {
 		err := term.Restore(0, oldTerm)
 		if err != nil {
-			log.Printf("Failed to restore terminal settings. Use the reset command to fix. Error was %w", err)
+			log.Printf("Failed to restore terminal settings. Use the reset command to fix. Error was %s", err)
 		}
 	}()
 
