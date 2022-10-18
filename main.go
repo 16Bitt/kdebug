@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +48,10 @@ type cliOptions struct {
 	containerName string
 	image         string
 	entrypoint    []string
+	timeout       time.Duration
 }
+
+type dimQueue chan remotecommand.TerminalSize
 
 func main() {
 	var podSpec *corev1.PodSpec
@@ -126,8 +130,14 @@ func newCliOptions() *cliOptions {
 	source := flag.String("source", "", "Resource name to debug")
 	containerName := flag.String("container-name", "", "Container name to target, if set, otherwise uses the first container")
 	image := flag.String("image", "", "Image to use, if set")
+	timeoutRaw := flag.String("timeout", "30m", "Timeout for the entrypoint. Only used if entrypoint is not overridden.")
 	flag.Var(entryArgs, "entry", "Entrypoint executable to execute while connecting a shell (repeat the flag to pass arguments)")
 	flag.Parse()
+
+	timeout, err := time.ParseDuration(*timeoutRaw)
+	if err != nil {
+		panic(err)
+	}
 
 	return &cliOptions{
 		namespace:     *ns,
@@ -135,6 +145,7 @@ func newCliOptions() *cliOptions {
 		rawSourceType: *sourceType,
 		source:        *source,
 		entrypoint:    entryArgs.toStringArr(),
+		timeout:       timeout,
 		containerName: *containerName,
 		image:         *image,
 	}
@@ -186,7 +197,7 @@ func (co *cliOptions) podFromSpec(spec *corev1.PodSpec) (*corev1.Pod, error) {
 	}
 
 	if len(co.entrypoint) == 0 {
-		container.Command = []string{"/bin/sleep", "600"}
+		container.Command = []string{"/bin/sleep", fmt.Sprintf("%.0f", co.timeout.Seconds())}
 	} else {
 		container.Command = co.entrypoint
 	}
@@ -313,11 +324,20 @@ func (c *clientWrapper) execAttached(pod *corev1.Pod, containerName string, comm
 		}
 	}()
 
+	queue := make(dimQueue, 2)
+	queue.update()
+	cancel := queue.monitor()
+	defer func() {
+		close(queue)
+		cancel <- true
+	}()
+
 	return process.Stream(remotecommand.StreamOptions{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Tty:    true,
+		Stdin:             os.Stdin,
+		Stdout:            os.Stdout,
+		Stderr:            os.Stderr,
+		Tty:               true,
+		TerminalSizeQueue: queue,
 	})
 }
 
@@ -347,4 +367,43 @@ func (args *flagArray) Set(value string) error {
 
 func (args *flagArray) toStringArr() []string {
 	return []string(*args)
+}
+
+// monitor spawns a goroutine to poll the current terminal dimensions and
+// enqueues them into a dimQueue. A chan is returned that can be used to signal
+// the shutdown of this goroutine.
+func (q dimQueue) monitor() chan bool {
+	cancel := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-cancel:
+				log.Printf("Stopping resize monitor")
+				close(cancel)
+				return
+			case <-time.After(5 * time.Second):
+				q.update()
+			}
+		}
+	}()
+
+	return cancel
+}
+
+func (q dimQueue) Next() *remotecommand.TerminalSize {
+	newDim, ok := <-q
+	if !ok {
+		return nil
+	}
+
+	return &newDim
+}
+
+func (q dimQueue) update() {
+	width, height, err := term.GetSize(0)
+	if err != nil {
+		panic(err)
+	}
+	q <- remotecommand.TerminalSize{Width: uint16(width), Height: uint16(height)}
 }
