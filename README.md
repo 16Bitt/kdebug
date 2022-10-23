@@ -91,10 +91,12 @@ minutes. This is intended to prevent unused pods littering your namespaces.
 
 ```
 Usage of kdebug:
+  -command value
+    	Command to execute in an interactive shell. Repeat this flag to pass multiple arguments. (default /bin/sh)
   -container-name string
     	Container name to target, if set, otherwise uses the first container
   -entry value
-    	Entrypoint executable to execute while connecting a shell (repeat the flag to pass arguments)
+    	Container entrypoint. Repeat this flag to pass multiple arguments. (default /bin/sleep 1800)
   -image string
     	Image to use, if set
   -name string
@@ -103,8 +105,6 @@ Usage of kdebug:
     	Namespace for resource and debug pod (default "default")
   -source string
     	Resource name to debug
-  -timeout string
-    	Timeout for the entrypoint. Only used if entrypoint is not overridden. (default "30m")
   -type string
     	Resource type to debug (default "deployment")
 ```
@@ -124,20 +124,22 @@ kdebug -namespace rails-demo \
   -entry /bin/sh -entry "-c" -entry "while true; do sleep 10; done"
 ```
 
-## Spawn a debug pod with a long timeout
+## Spawn a rails shell with a long timeout
 
 ```sh
 kdebug -namespace rails-demo \
   -type deployment \
   -source rails-demo-deployment \
-  -timeout 24h
+  -entry /bin/sleep \
+  -entry 3600 \
+  -command bin/rails \
+  -command console
 ```
 
 # Bugs and sharp edges
 
 - The `flag` parsing is pretty weird if you're used to `kubectl`. Perhaps something like `kdebug
   deployment my-deployment -namespace foo-bar` would be a bit more intuitive.
-- No option for specifying the entrypoint command (`/bin/sh` is hard-coded)
 - No support for containers that don't have any interactive environment (e.g. `FROM scratch` images)
 - No support overwriting the resource configuration
 - The way the `kubecfg` is loaded does not load the default namespace for the context. This forces

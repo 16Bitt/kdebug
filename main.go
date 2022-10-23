@@ -60,7 +60,7 @@ func main() {
 		targetContainer = created.Spec.Containers[0].Name
 	}
 
-	err = client.execAttached(created, targetContainer, []string{"/bin/sh"})
+	err = client.execAttached(created, targetContainer, options.command)
 	if err != nil {
 		panic(err)
 	}

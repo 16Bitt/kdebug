@@ -31,11 +31,7 @@ func podFromSpec(co *cliOptions, spec *corev1.PodSpec) (*corev1.Pod, error) {
 		}
 	}
 
-	if len(co.entrypoint) == 0 {
-		container.Command = []string{"/bin/sleep", fmt.Sprintf("%.0f", co.timeout.Seconds())}
-	} else {
-		container.Command = co.entrypoint
-	}
+	container.Command = co.entrypoint
 	container.Args = []string{}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil

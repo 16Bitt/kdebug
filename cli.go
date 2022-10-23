@@ -4,10 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"strings"
-	"time"
 )
 
-type flagArray []string
+type flagArray struct {
+	// pristine indicates if the flagArray still contains default values. The
+	// first call to Set when pristine is true will clear pristine and the
+	// underlying elements.
+	pristine bool
+	elements []string
+}
 
 type cliOptions struct {
 	namespace     string
@@ -17,11 +22,18 @@ type cliOptions struct {
 	containerName string
 	image         string
 	entrypoint    []string
-	timeout       time.Duration
+	command       []string
 }
 
 func newCliOptions() *cliOptions {
-	entryArgs := &flagArray{}
+	entryArgs := &flagArray{
+		pristine: true,
+		elements: []string{"/bin/sleep", "1800"},
+	}
+	commandArgs := &flagArray{
+		pristine: true,
+		elements: []string{"/bin/sh"},
+	}
 
 	ns := flag.String("namespace", "default", "Namespace for resource and debug pod")
 	name := flag.String("name", "kdebug-pod", "Name of debugging pod created")
@@ -29,22 +41,17 @@ func newCliOptions() *cliOptions {
 	source := flag.String("source", "", "Resource name to debug")
 	containerName := flag.String("container-name", "", "Container name to target, if set, otherwise uses the first container")
 	image := flag.String("image", "", "Image to use, if set")
-	timeoutRaw := flag.String("timeout", "30m", "Timeout for the entrypoint. Only used if entrypoint is not overridden.")
-	flag.Var(entryArgs, "entry", "Entrypoint executable to execute while connecting a shell (repeat the flag to pass arguments)")
+	flag.Var(entryArgs, "entry", "Container entrypoint. Repeat this flag to pass multiple arguments.")
+	flag.Var(commandArgs, "command", "Command to execute in an interactive shell. Repeat this flag to pass multiple arguments.")
 	flag.Parse()
-
-	timeout, err := time.ParseDuration(*timeoutRaw)
-	if err != nil {
-		panic(err)
-	}
 
 	return &cliOptions{
 		namespace:     *ns,
 		name:          *name,
 		resourceType:  *resourceType,
 		source:        *source,
-		entrypoint:    entryArgs.toStringArr(),
-		timeout:       timeout,
+		entrypoint:    entryArgs.elements,
+		command:       commandArgs.elements,
 		containerName: *containerName,
 		image:         *image,
 	}
@@ -64,14 +71,15 @@ func (co *cliOptions) validate() error {
 }
 
 func (args *flagArray) String() string {
-	return strings.Join(args.toStringArr(), ", ")
+	return strings.Join(args.elements, " ")
 }
 
 func (args *flagArray) Set(value string) error {
-	*args = append(*args, value)
-	return nil
-}
+	if args.pristine {
+		args.pristine = false
+		args.elements = []string{}
+	}
 
-func (args *flagArray) toStringArr() []string {
-	return []string(*args)
+	args.elements = append(args.elements, value)
+	return nil
 }
